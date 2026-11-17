@@ -16,6 +16,22 @@ const SQL_LAMARAN = `
   SELECT l.id, l.lowongan_id AS jobId, u.username, u.name AS nama, u.email, l.cv, l.pesan, l.tanggal
   FROM lamaran l JOIN users u ON u.id = l.user_id`;
 
+// GET / — info API supaya alamat root tidak dianggap error
+app.get("/", (req, res) => {
+  res.json({
+    name: "KerjaKu API",
+    status: "ok",
+    endpoints: [
+      "GET  /api/jobs?search=",
+      "GET  /api/jobs/:id",
+      "POST /api/login",
+      "PUT  /api/users/:username",
+      "GET  /api/lamaran?username=&jobId=",
+      "POST /api/lamaran",
+    ],
+  });
+});
+
 // GET /api/jobs?search=dev
 app.get("/api/jobs", (req, res) => {
   const search = req.query.search || "";
