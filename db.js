@@ -1,10 +1,28 @@
 const sqlite3 = require("sqlite3");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
-// File database SQLite. Dibuat otomatis kalau belum ada.
-const FILE = path.join(__dirname, "data", "kerjaku.db");
-fs.mkdirSync(path.dirname(FILE), { recursive: true });
+// Lokasi database SQLite. Coba berurutan: DB_DIR, folder data di sebelah kode, lalu tmpdir.
+// Di platform deploy folder aplikasi kadang read-only, sehingga tidak bisa ditulisi.
+const cariFolderData = () => {
+  const kandidat = [process.env.DB_DIR, path.join(__dirname, "data"), path.join(os.tmpdir(), "kerjaku")];
+
+  for (const dir of kandidat) {
+    if (!dir) continue;
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.accessSync(dir, fs.constants.W_OK);
+      return dir;
+    } catch (err) {
+      console.warn(`Folder data ${dir} tidak bisa dipakai (${err.code || err.message}), coba lokasi lain.`);
+    }
+  }
+
+  throw new Error("Tidak ada folder yang bisa ditulis untuk menyimpan database SQLite");
+};
+
+const FILE = path.join(cariFolderData(), "kerjaku.db");
 const fileBaru = !fs.existsSync(FILE);
 const db = new sqlite3.Database(FILE);
 
