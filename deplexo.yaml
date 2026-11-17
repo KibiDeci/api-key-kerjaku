@@ -1,0 +1,10 @@
+version: 1
+type: web
+
+build:
+  framework: auto
+  install: npm ci
+
+run:
+  command: npm start
+  port: 8000
