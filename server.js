@@ -4,7 +4,8 @@ const db = require("./db");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 const PORT = process.env.PORT || 8000;
 
@@ -50,6 +51,26 @@ app.get("/api/jobs/:id", (req, res) => {
   });
 });
 
+// POST /api/jobs
+app.post("/api/jobs", (req, res) => {
+  const { title, company, location, salary, description, logo } = req.body;
+  if (!title || !company) {
+    return res.status(422).json({ message: "Judul dan nama perusahaan wajib diisi" });
+  }
+
+  db.run(
+    "INSERT INTO lowongan (title, company, location, salary, description, logo) VALUES (?, ?, ?, ?, ?, ?)",
+    [title, company, location || "", salary || "", description || "", logo || ""],
+    function (err) {
+      if (err) return errorServer(res, err);
+      db.get("SELECT * FROM lowongan WHERE id = ?", [this.lastID], (err, job) => {
+        if (err) return errorServer(res, err);
+        res.status(201).json(job);
+      });
+    }
+  );
+});
+
 // POST /api/login
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
@@ -58,7 +79,7 @@ app.post("/api/login", (req, res) => {
   }
 
   db.get(
-    "SELECT username, name, email, phone FROM users WHERE username = ? AND password = ?",
+    "SELECT username, name, email, phone, avatar FROM users WHERE username = ? AND password = ?",
     [username, password],
     (err, user) => {
       if (err) return errorServer(res, err);
@@ -70,7 +91,7 @@ app.post("/api/login", (req, res) => {
 
 // PUT /api/users/:username
 app.put("/api/users/:username", (req, res) => {
-  const { name, email, phone, password } = req.body;
+  const { name, email, phone, password, avatar } = req.body;
 
   db.get("SELECT id FROM users WHERE username = ?", [req.params.username], (err, user) => {
     if (err) return errorServer(res, err);
@@ -83,16 +104,15 @@ app.put("/api/users/:username", (req, res) => {
       return res.status(422).json({ message: "Password minimal 6 karakter" });
     }
 
-    // COALESCE: kalau password kosong (null), password lama tetap dipakai
     db.run(
-      "UPDATE users SET name = ?, email = ?, phone = ?, password = COALESCE(?, password) WHERE id = ?",
-      [name, email, phone || "", password || null, user.id],
+      "UPDATE users SET name = ?, email = ?, phone = ?, avatar = COALESCE(?, avatar), password = COALESCE(?, password) WHERE id = ?",
+      [name, email, phone || "", avatar || null, password || null, user.id],
       (err) => {
         if (err && err.code === "SQLITE_CONSTRAINT") {
           return res.status(422).json({ message: "Email sudah dipakai user lain" });
         }
         if (err) return errorServer(res, err);
-        res.json({ username: req.params.username, name, email, phone: phone || "" });
+        res.json({ username: req.params.username, name, email, phone: phone || "", avatar: avatar || "" });
       }
     );
   });
@@ -149,6 +169,15 @@ app.post("/api/lamaran", (req, res) => {
         }
       );
     });
+  });
+});
+
+// Hapus lowongan: DELETE /api/jobs/:id
+app.delete("/api/jobs/:id", (req, res) => {
+  db.run("DELETE FROM lowongan WHERE id = ?", [req.params.id], function (err) {
+    if (err) return errorServer(res, err);
+    if (this.changes === 0) return res.status(404).json({ message: "Lowongan tidak ditemukan" });
+    res.json({ message: "Lowongan berhasil dihapus" });
   });
 });
 
